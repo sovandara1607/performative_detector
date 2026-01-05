@@ -1,6 +1,6 @@
 # 🍵 Performative Detector
 
-A fun Python project that uses MediaPipe and computer vision to detect when you're holding a matcha (or any cup) and plays "Juna by Clairo" on Spotify while displaying "PERFORMATIVE" on screen.
+A fun Python project that uses MediaPipe and computer vision to detect when you're holding a matcha (or any cup) and plays "ANY SONGS IN YOUR OWN PLAYLISTS" on Spotify while displaying "PERFORMATIVE" on screen.
 
 ## Features
 
@@ -20,7 +20,7 @@ The detector uses MediaPipe Hands to:
 When holding is detected:
 
 - Display shows "PERFORMATIVE" in pink
-- Automatically plays "Juna by Clairo" on Spotify (if configured)
+- Automatically plays "UR FAV PLAYLIST" on Spotify (if configured)
 
 When not holding:
 
@@ -245,7 +245,6 @@ performative/
 
 Created with ❤️ using MediaPipe, OpenCV, and Spotipy.
 
-Song: "Juna" by Clairo
 
 ---
 
