@@ -13,14 +13,17 @@ A fun Python project that uses MediaPipe and computer vision to detect when you'
 ## How It Works
 
 The detector uses MediaPipe Hands to:
+
 1. **Two-hand detection**: Detects when both hands are close together (holding something between them)
 2. **Single-hand detection**: Detects when fingers are in a gripping position (holding a cup)
 
 When holding is detected:
+
 - Display shows "PERFORMATIVE" in pink
 - Automatically plays "Juna by Clairo" on Spotify (if configured)
 
 When not holding:
+
 - Display shows "not performative" in gray
 
 ## Prerequisites
@@ -35,6 +38,7 @@ When not holding:
 1. **Clone or navigate to this directory**
 
 2. **Install dependencies**
+
    ```bash
    pip install -r requirements.txt
    ```
@@ -44,44 +48,50 @@ When not holding:
    The app works without Spotify, but you won't get the music playback feature.
 
    a. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
-   
+
    b. Log in and click "Create an App"
-   
+
    c. Fill in the app details:
-      - App name: "Performative Detector"
-      - App description: "Detects performative matcha holding"
-      - Redirect URI: `http://localhost:8888/callback`
-   
+
+   - App name: "Performative Detector"
+   - App description: "Detects performative matcha holding"
+   - Redirect URI: `http://localhost:8888/callback`
+
    d. Copy your Client ID and Client Secret
-   
+
    e. Create a `.env` file in the project directory:
-      ```bash
-      cp .env.example .env
-      ```
-   
+
+   ```bash
+   cp .env.example .env
+   ```
+
    f. Edit `.env` and add your credentials:
-      ```
-      SPOTIFY_CLIENT_ID=your_client_id_here
-      SPOTIFY_CLIENT_SECRET=your_client_secret_here
-      SPOTIFY_REDIRECT_URI=http://localhost:8888/callback
-      ```
+
+   ```
+   SPOTIFY_CLIENT_ID=your_client_id_here
+   SPOTIFY_CLIENT_SECRET=your_client_secret_here
+   SPOTIFY_REDIRECT_URI=http://localhost:8888/callback
+   ```
 
 4. **Make sure Spotify is open**
-   
+
    Before running the detector, open Spotify on any device (desktop app, phone, web player). This is needed for playback control.
 
 ## Usage
 
 Run the detector:
+
 ```bash
 python performative_detector.py
 ```
 
 **Controls:**
+
 - Hold a cup/matcha in front of the camera
 - Press `q` to quit
 
 **Tips for best detection:**
+
 - Hold the cup with both hands close together, OR
 - Hold with one hand in a clear gripping gesture
 - Keep hands in the center area of the frame
@@ -90,6 +100,7 @@ python performative_detector.py
 ## First Run - Spotify Authorization
 
 The first time you run the app with Spotify enabled:
+
 1. A browser window will open asking you to log in to Spotify
 2. Authorize the app
 3. You'll be redirected to a localhost page (which may not load - that's OK!)
@@ -98,50 +109,101 @@ The first time you run the app with Spotify enabled:
 ## Troubleshooting
 
 ### "No active Spotify devices found"
+
 - Open Spotify on your computer, phone, or web player
 - Play any song briefly to activate the device
 - Run the detector again
 
 ### "Spotify credentials not found"
+
 - Make sure you created the `.env` file
 - Verify your Client ID and Secret are correct
 - Check that the `.env` file is in the same directory as the scripts
 
 ### Hand detection not working well
+
 - Ensure good lighting
 - Try holding the cup with both hands
 - Move closer to or further from the camera
 - Adjust the `min_detection_confidence` in `performative_detector.py` (line 23)
 
 ### Camera not opening
+
 - Check if another application is using the camera
 - Try changing the camera index in `performative_detector.py` line 37: `self.cap = cv2.VideoCapture(0)` - change 0 to 1, 2, etc.
 
 ## Customization
 
 ### Change the Song
+
 Edit `spotify_controller.py` line 16 to change the track URI:
+
 ```python
 self.target_track_uri = "spotify:track:YOUR_TRACK_URI"
 ```
 
 To find a track URI:
+
 1. Open Spotify
 2. Right-click a song
 3. Share → Copy Song Link
 4. The URI is in the format: `spotify:track:ID` (extract from the link)
 
 ### Adjust Detection Sensitivity
+
 In `performative_detector.py`:
+
 - Line 23: Change `min_detection_confidence` (0.5-0.9, lower = more sensitive)
 - Line 33: Change `holding_duration_threshold` (seconds before triggering)
 - Line 88: Change distance threshold for two-hand detection
 - Line 113: Adjust curl detection for single-hand holding
 
 ### Change Display Text
+
 In `performative_detector.py`, lines 215-218:
+
 ```python
 self.draw_text(frame, "YOUR TEXT HERE", (147, 20, 255), 3.0)
+```
+
+### Playlists and multiple tracks 🎧
+
+You can configure the detector to play a playlist or a list of tracks instead of the single default song.
+
+- Set a playlist URI in your `.env`:
+
+```
+SPOTIFY_PLAYLIST_URI=spotify:playlist:37i9dQZF1DXcBWIGoYBM5M
+```
+
+- Or provide a comma-separated list of track URIs:
+
+```
+SPOTIFY_TRACK_URIS=spotify:track:ID1,spotify:track:ID2,spotify:track:ID3
+```
+
+- Optionally enable shuffle with:
+
+```
+SPOTIFY_SHUFFLE=1
+```
+
+Behavior:
+
+- The app prefers `SPOTIFY_PLAYLIST_URI` if present. Otherwise it will use `SPOTIFY_TRACK_URIS` if provided. If neither is configured it falls back to the default single track.
+- If your account is not Spotify Premium the Web API cannot remotely start playback; in that case the app falls back to driving your local Spotify desktop app via AppleScript (it will open/raise Spotify and start the track/playlist locally).
+
+Quick test helper
+
+- There's a helper script at `scripts/spotify_test.py` to list devices and control playback manually:
+
+```bash
+source .venv/bin/activate
+python scripts/spotify_test.py status
+python scripts/spotify_test.py play
+python scripts/spotify_test.py next
+python scripts/spotify_test.py prev
+python scripts/spotify_test.py shuffle on
 ```
 
 ## Project Structure
@@ -188,6 +250,3 @@ Song: "Juna" by Clairo
 ---
 
 **Enjoy being performative! 🍵✨**
-
-
-
