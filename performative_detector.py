@@ -51,6 +51,8 @@ class PerformativeDetector:
         print(f"🎵 Spotify: {'Connected' if self.spotify.is_spotify_available() else 'Disabled'}")
         print("📋 Instructions:")
         print("   - Hold a cup/matcha in front of camera to be PERFORMATIVE")
+        print("   - Pinch thumb & index finger together to control volume")
+        print("   - Swipe left/right to change tracks")
         print("   - Press 'q' to quit")
         # UI state for on-screen buttons
         self.ui_buttons = {}  # name -> (x, y, w, h)
@@ -66,6 +68,14 @@ class PerformativeDetector:
         self.swipe_cooldown = 1.5  # seconds between swipes
         self.last_swipe_time = 0
         self.swipe_threshold = 0.15  # Minimum horizontal movement (normalized)
+        
+        # Volume control with pinch gesture
+        self.volume_control_enabled = True
+        self.current_volume = self.get_system_volume()
+        self.last_volume_update = 0
+        self.volume_update_cooldown = 0.1  # Update volume every 100ms
+        self.pinch_threshold_min = 0.02  # Minimum pinch distance (volume 0)
+        self.pinch_threshold_max = 0.15  # Maximum pinch distance (volume 100)
 
         # Create a named Status window and set mouse callback for simple UI buttons
         try:
@@ -362,6 +372,55 @@ class PerformativeDetector:
         except Exception as e:
             pass  # Silently fail if AppleScript doesn't work
     
+    def get_system_volume(self):
+        """Get current system volume (0-100) - macOS specific"""
+        try:
+            result = subprocess.run(['osascript', '-e', 'output volume of (get volume settings)'],
+                                  capture_output=True, text=True, timeout=1)
+            if result.returncode == 0:
+                return int(result.stdout.strip())
+        except Exception as e:
+            print(f"⚠️ Failed to get volume: {e}")
+        return 50  # Default fallback
+    
+    def set_system_volume(self, volume):
+        """Set system volume (0-100) - macOS specific"""
+        try:
+            volume = max(0, min(100, int(volume)))  # Clamp to 0-100
+            subprocess.run(['osascript', '-e', f'set volume output volume {volume}'],
+                         capture_output=True, timeout=1)
+            return True
+        except Exception as e:
+            print(f"⚠️ Failed to set volume: {e}")
+            return False
+    
+    def detect_pinch_gesture(self, hand_landmarks):
+        """Detect pinch gesture between thumb and index finger
+        Returns: distance between thumb tip and index finger tip (normalized)
+        """
+        # Get thumb tip and index finger tip
+        thumb_tip = hand_landmarks.landmark[4]
+        index_tip = hand_landmarks.landmark[8]
+        
+        # Calculate Euclidean distance
+        distance = np.sqrt((thumb_tip.x - index_tip.x)**2 + 
+                          (thumb_tip.y - index_tip.y)**2 + 
+                          (thumb_tip.z - index_tip.z)**2)
+        
+        return distance
+    
+    def map_pinch_to_volume(self, pinch_distance):
+        """Map pinch distance to volume level (0-100)"""
+        # Clamp distance to our threshold range
+        clamped = max(self.pinch_threshold_min, 
+                     min(self.pinch_threshold_max, pinch_distance))
+        
+        # Map to 0-100 range (closer pinch = lower volume)
+        volume = ((clamped - self.pinch_threshold_min) / 
+                 (self.pinch_threshold_max - self.pinch_threshold_min)) * 100
+        
+        return int(volume)
+    
     def detect_swipe_gesture(self, hand_landmarks, current_time):
         """Detect left/right swipe gestures for track control
         Returns: 'left', 'right', or None
@@ -412,8 +471,39 @@ class PerformativeDetector:
         font = cv2.FONT_HERSHEY_SIMPLEX
         
         # Instructions at bottom
-        cv2.putText(frame, "Press 'q' to quit | Swipe left/right to change tracks", 
+        cv2.putText(frame, "Press 'q' to quit | Swipe left/right: tracks | Pinch: volume", 
                    (10, frame.shape[0] - 20), font, 0.6, (200, 200, 200), 1)
+        
+        # Draw volume indicator at top-right
+        if self.volume_control_enabled:
+            vol_text = f"Volume: {self.current_volume}%"
+            text_size = cv2.getTextSize(vol_text, font, 0.8, 2)[0]
+            text_x = frame.shape[1] - text_size[0] - 20
+            text_y = 40
+            
+            # Draw semi-transparent background
+            overlay = frame.copy()
+            cv2.rectangle(overlay, (text_x - 10, text_y - 30), 
+                         (frame.shape[1] - 10, text_y + 10), (40, 40, 40), -1)
+            cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
+            
+            # Draw text
+            cv2.putText(frame, vol_text, (text_x, text_y), font, 0.8, (100, 200, 255), 2)
+            
+            # Draw volume bar
+            bar_x = text_x - 10
+            bar_y = text_y + 20
+            bar_width = text_size[0] + 20
+            bar_height = 15
+            
+            # Background bar
+            cv2.rectangle(frame, (bar_x, bar_y), 
+                         (bar_x + bar_width, bar_y + bar_height), (60, 60, 60), -1)
+            
+            # Filled bar based on volume
+            fill_width = int((self.current_volume / 100.0) * bar_width)
+            cv2.rectangle(frame, (bar_x, bar_y), 
+                         (bar_x + fill_width, bar_y + bar_height), (100, 200, 255), -1)
 
     def _on_status_mouse(self, event, x, y, flags, param):
         """Handle mouse clicks on the Status window buttons."""
@@ -499,6 +589,23 @@ class PerformativeDetector:
                     self.mp_draw.draw_landmarks(
                         frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS
                     )
+                
+                # Volume control with pinch gesture on first hand
+                if len(hand_landmarks_list) > 0 and self.volume_control_enabled:
+                    if current_time - self.last_volume_update >= self.volume_update_cooldown:
+                        pinch_distance = self.detect_pinch_gesture(hand_landmarks_list[0])
+                        
+                        # Only update volume if pinch is detected (distance is small enough)
+                        if pinch_distance <= self.pinch_threshold_max:
+                            new_volume = self.map_pinch_to_volume(pinch_distance)
+                            
+                            # Only update if volume changed significantly (reduces system calls)
+                            if abs(new_volume - self.current_volume) >= 2:
+                                if self.set_system_volume(new_volume):
+                                    self.current_volume = new_volume
+                                    print(f"🔊 Volume: {new_volume}%")
+                            
+                            self.last_volume_update = current_time
                 
                 # Detect swipe gestures on first hand (only when already performative)
                 if len(hand_landmarks_list) > 0 and self.is_holding:
