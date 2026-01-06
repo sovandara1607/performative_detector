@@ -243,7 +243,7 @@ performative/
 
 ## Credits
 
-Created with ❤️ using MediaPipe, OpenCV, and Spotipy.
+Created with ❤️ using MediaPipe, OpenCV, and Spotify.
 
 
 ---
